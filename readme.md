@@ -119,11 +119,12 @@ I debated a lot on whether to include comments as a core feature of .papr or not
 This repository also contains basic libraries to encode and decode .papr files for popular languages. The following languages are available:
 
 - c++
+- javascript
+- typescript
 
 **Planned Languages:**
 - c#
 - gdscript
-- js
 
 ## Contributing
 The libraries that I've written capture the essence and usability of this format. But, I don't think they are performant or optimized to be the best version they could be. If anyone else wants to take a stab at it and improve performance, please create a pull request, and I'll take a look at it. Thanks!
