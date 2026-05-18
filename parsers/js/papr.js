@@ -92,6 +92,9 @@ export class Node {
         if (this.HasValue()) {
             return this.children[0].text;
         }
+        if (this.type === 'Value') {
+            return this.text;
+        }
         return "";
     }
     /** Update the key in the node */
@@ -411,4 +414,3 @@ export function Serialize(node) {
     let simplified = node.Clone().Simplify();
     return SerializeRecursive(0, simplified, "");
 }
-
