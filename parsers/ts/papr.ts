@@ -127,6 +127,10 @@ export class Node
         {
             return this.children[ 0 ]!.text;
         }
+        if( this.type === 'Value' )
+        {
+            return this.text;
+        }
         return "";
     }
 

@@ -698,6 +698,10 @@ inline const std::string& Papr::Node::GetValue() const
     {
         return m_children[ 0 ]->m_text;
     }
+    if( GetNodeType() == NodeType::Value )
+    {
+        return m_text;
+    }
     return INVALID.m_text;
 }
 
