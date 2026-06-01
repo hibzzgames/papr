@@ -486,10 +486,57 @@ function SerializeRecursive( depth : number, node : Node, out : string ) : strin
     return out;
 }
 
+/** Internal function used to convert a json object to a list of papr nodes */
+function FromJsonRecursive( obj : any ) : Node[]
+{
+    // Stores the output list of nodes
+    const node_list : Node[] = [];
+
+    // Is it a list?
+    if( Array.isArray( obj ) )
+    {
+        for( const item of obj )
+        {
+            const group_node = Node.MakeGroup();
+            const value_nodes = FromJsonRecursive( item );
+            for( const node of value_nodes )
+            {
+                group_node.AddNode( node );
+            }
+            node_list.push( group_node );
+        }
+    }
+
+    // Is it a JSON object?
+    else if( obj !== null && typeof obj === 'object' )
+    {
+        for( const [ key, value ] of Object.entries( obj ) )
+        {
+            const key_node = Node.MakeKey( key );
+            const value_nodes = FromJsonRecursive( value );
+            for( const node of value_nodes )
+            {
+                key_node.AddNode( node );
+            }
+            node_list.push( key_node );
+        }
+    }
+
+    // Neither a list or an object, must be a primitive. Making it a value node 
+    // and returning back to caller
+    else
+    {
+        const value_node = Node.MakeValue( String( obj ) );
+        node_list.push( value_node );
+    }
+
+    return node_list;
+}
+
 /** An internal namespace, giving optional public access to internal function. 
  *  Not recommended using it, but if you for some reason want to, I'm not going 
  *  to block it. */
-export const Internal = { TokenTrim, Tokenize, SerializeRecursive } as const;
+export const Internal = { TokenTrim, Tokenize, SerializeRecursive, FromJsonRecursive } as const;
 
 /** Parse the given string in .papr file format into an accessible papr object */
 export function Parse( data : string ) : Node | null
@@ -579,4 +626,92 @@ export function Serialize( node : Node ) : string
 {
     let simplified : Node = node.Clone().Simplify();
     return SerializeRecursive( 0, simplified, "" );
+}
+
+/** Convert a given papr node to json */
+export function ToJson( node : Node, value_as_primitive : boolean = true ) : any
+{
+    // Collapse the given list of nodes to a json adjacent structure if possible
+    function m_Flatten( nodes : Node[] ) : any
+    {
+        // If every node is a group, then we need to wrap it up in a list
+        if( nodes.every( ( node ) => node.type === 'Group' ) )
+        {
+            const list = [];
+            for( const node of nodes )
+            {
+                list.push( ToJson( node, value_as_primitive ) );
+            }
+            return list.length === 1 ? list[ 0 ] : list;
+        }
+
+        // If every node is a key, combine the result into a single object
+        if( nodes.every( ( node ) => node.type === 'Key' ) )
+        {
+            const object = {};
+            for( const node of nodes )
+            {
+                Object.assign( object, ToJson( node, value_as_primitive ) );
+            }
+            return object;
+        }
+
+        // Lastly, if every node is a value combine them into a space separated 
+        // strings. The one exception is going to be a singular value, then 
+        // return as is
+        if( nodes.every( ( node ) => node.type === 'Value' ) )
+        {
+            if( nodes.length === 1 ) 
+            { 
+                return ToJson( nodes[ 0 ] );
+            }
+            return nodes.map( ( node ) => node.text ).join( ' ' );
+        }
+
+        // Contains a mixed bag of things, this isn't really something that I 
+        // expected. If it happens lets deal with that in the future, but for 
+        // now returning null
+        return null;
+    }
+
+    if( node.type === "Value" )
+    {
+        // A value node has no children, so we only care about its text value. 
+        // We will also attempt to convert the string into a primitive type 
+        // values when requested
+        if( value_as_primitive && node.text.length > 0 )
+        {
+            if( node.text === "true" )      { return true;      }
+            if( node.text === "false" )     { return false;     }
+            if( node.text === "null" )      { return null;      }
+            if( node.text === "undefined" ) { return undefined; }
+
+            const number = Number( node.text );
+            if( !isNaN( number ) ) 
+            { 
+                return number; 
+            }
+        }
+
+        return node.text;
+    }
+    else if( node.type === "Key" )
+    {
+        return { [ node.text ]: m_Flatten( node.children ) };
+    }
+    
+    // It's either a 'group' or 'none' node, simply collapse any children and 
+    // return back. The 'none' node is currently only reserved for the root node
+    return m_Flatten( node.children );;
+}
+
+/** Convert the given json into a papr node */
+export function FromJson( json : object ) : Node
+{
+    const root = new Node();
+    for( const node of FromJsonRecursive( json ) )
+    {
+        root.AddNode( node );
+    }
+    return root.Simplify();
 }
