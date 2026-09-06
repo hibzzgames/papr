@@ -73,8 +73,8 @@ export class Node {
     }
     /** Check if the node has a value */
     HasValue() {
-        // A key or a group node is considered to have a value if it has 
-        // exactly one value node as a child
+        // A key or a group node is considered to have a value if it has exactly one value node as a 
+        // child
         if ((this.type === 'Key' || this.type === 'Group') && this.children.length === 1) {
             return this.children[0].type === 'Value';
         }
@@ -96,6 +96,29 @@ export class Node {
             return this.text;
         }
         return "";
+    }
+    /** Get this node's children as a list of entries, useful when iterating nodes that are meant to
+     *  represent an array. It automatically handles child nodes of length 0/1/2+ gracefully. */
+    GetEntries() {
+        if (this.children.length > 0) {
+            // If we're storing a list of groups, it's already what we want
+            if (this.children[0].type === 'Group') {
+                return this.children;
+            }
+            else {
+                // Wrap self in an array and return it, making iterating with for...of loop much 
+                // more user friendly
+                return [this];
+            }
+        }
+        return [];
+    }
+    /** Look up a child by a key and get it's entries as a list. It's a shorthand for getting the
+     *  getting the child node as key and following that up with GetEntries(). Returns an empty list
+     *  if the key doesn't exist. */
+    GetEntriesAt(key) {
+        const child = this.Get(key);
+        return child ? child.GetEntries() : [];
     }
     /** Update the key in the node */
     UpdateKey(key) {
@@ -143,14 +166,13 @@ export class Node {
         for (const child of this.children) {
             child.Simplify();
         }
-        // A key node with only one child and that child is a 'group' node, 
-        // then the children of the group node can be directly shortcut to be 
-        // children of this 'key' node
+        // A key node with only one child and that child is a 'group' node, then the children of the 
+        // group node can be directly shortcut to be children of this 'key' node
         if (this.type === 'Key' && this.children.length === 1 && this.children[0].type === 'Group') {
             this.children = this.children[0].children;
         }
-        // A key or a group node with only a list of value nodes can be 
-        // simplified into a combined string separated by a space
+        // A key or a group node with only a list of value nodes can be simplified into a combined 
+        // string separated by a space
         if ((this.type === 'Key' || this.type === 'Group') && this.children.length > 1) {
             const is_all_values = this.children.every(child => child.type === 'Value');
             if (is_all_values) {
@@ -175,13 +197,12 @@ export class Node {
 function TokenTrim(token, token_start_col) {
     // Start by trimming the leading and trailing spaces
     let result = token.trim();
-    // After trimming the leading and trailing spaces, if the characters with a 
-    // double quote, remove it and also the last double quote
+    // After trimming the leading and trailing spaces, if the characters with a double quote, remove 
+    // it and also the last double quote
     if (result.startsWith('"')) {
         result = result.substring(1, result.length - (result.endsWith('"') ? 1 : 0));
-        // The result may contain new lines and in that case, according to the 
-        // papr specs, new lines must be padded with spaces till it reaches the 
-        // double quote that started the token
+        // The result may contain new lines and in that case, according to the papr specs, new lines 
+        // must be padded with spaces till it reaches the double quote that started the token
         let new_line_pos = result.indexOf('\n');
         while (new_line_pos !== -1) {
             const start = new_line_pos + 1;
@@ -196,20 +217,19 @@ function TokenTrim(token, token_start_col) {
     }
     return result;
 }
-/** Internal function that breaks a given string into tokens that can be used
- * by the parser to build a network of papr nodes and intermediate nodes */
+/** Internal function that breaks a given string into tokens that can be used by the parser to build
+ *  a network of papr nodes and intermediate nodes */
 function Tokenize(data) {
     // Stores all the tokens
     let tokens = [];
-    // The partial string that gets accumulated as each new character is 
-    // processed
+    // The partial string that gets accumulated as each new character is processed
     let partial_token = "";
-    // Tracks the column and line count of the current character being 
-    // processed. The first character in a document is at column 1, line 1
+    // Tracks the column and line count of the current character being processed. The first 
+    // character in a document is at column 1, line 1
     let char_col = 0;
     let char_line = 1;
-    // Variables used to track the column and line count of the first character 
-    // in a token being built
+    // Variables used to track the column and line count of the first character in a token being 
+    // built
     let token_start_col = 0;
     let token_start_line = 0;
     // Is the token being parsed inside double quotes?
@@ -218,8 +238,8 @@ function Tokenize(data) {
     let token_has_content = false;
     // Is the content being parsed a comment?
     let in_comment = false;
-    // A colon, new line, EOF, or the hashtag symbols (used to represent a 
-    // comment) are all considered as delimiters
+    // A colon, new line, EOF, or the hashtag symbols (used to represent a comment) are all 
+    // considered as delimiters
     function isDelimiter(c) {
         return c === ':' || c === '\n' || c === '#' || c === '\0';
     }
@@ -241,14 +261,13 @@ function Tokenize(data) {
             token_start_col = char_col;
             token_start_line = char_line;
         }
-        // Only tokens starting with a double quote is considered as being in 
-        // quotes and can ignore delimiters inside it.
+        // Only tokens starting with a double quote is considered as being in quotes and can ignore 
+        // delimiters inside it.
         if (is_first_char_in_token && c === '"') {
             in_quotes = true;
         }
-        // The token is considered to be no longer in quotes when it encounters 
-        // another double quote character (as long it's not prepended with an 
-        // escape sequence character)
+        // The token is considered to be no longer in quotes when it encounters another double quote 
+        // character (as long it's not prepended with an escape sequence character)
         if (in_quotes && c === '"' && !is_first_char_in_token && pc !== '\\') {
             in_quotes = false;
         }
@@ -289,10 +308,9 @@ function Tokenize(data) {
     }
     return tokens;
 }
-/** Internal function that serializes a papr node recursively and returns the
- *  out value. With the c++ implementation, I was able to pass the out string
- *  as a reference but since that's not possible in typescript/javascript, I'll
- *  be returning that value instead */
+/** Internal function that serializes a papr node recursively and returns the out value. With the
+ *  c++ implementation, I was able to pass the out string as a reference but since that's not
+ *  possible in typescript/javascript, I'll be returning that value instead */
 function SerializeRecursive(depth, node, out) {
     function sanitizeString(text, col) {
         if (text.indexOf(':') !== -1 // Colon is reserved for creating parent child relationship between tokens
@@ -372,31 +390,28 @@ function FromJsonRecursive(obj) {
             node_list.push(key_node);
         }
     }
-    // Neither a list or an object, must be a primitive. Making it a value node 
-    // and returning back to caller
+    // Neither a list or an object, must be a primitive. Making it a value node and returning back 
+    // to caller
     else {
         const value_node = Node.MakeValue(String(obj));
         node_list.push(value_node);
     }
     return node_list;
 }
-/** An internal namespace, giving optional public access to internal function.
- *  Not recommended using it, but if you for some reason want to, I'm not going
- *  to block it. */
+/** An internal namespace, giving optional public access to internal function. Not recommended using
+ *  it, but if you for some reason want to, I'm not going to block it. */
 export const Internal = { TokenTrim, Tokenize, SerializeRecursive, FromJsonRecursive };
 /** Parse the given string in .papr file format into an accessible papr object */
 export function Parse(data) {
-    // The root of the papr tree structure. This is the only valid node with 
-    // the 'None' node type.
+    // The root of the papr tree structure. This is the only valid node with the 'None' node type.
     const root = new Node();
     // The stack keeps track of the current hierarchy of nodes being built
     const stack = [];
     stack.push({ node: root, token: { type: 'None', text: "", line: 0, column: 0 } });
     function seekFn(col, token_types) {
-        // As you look for nodes, pop the elements from the stack if it's not 
-        // something you're look for + ignore any with column greater OR EQUAL 
-        // to token's column count at any when looking for a node to attach to. 
-        // If the stack become empty, return an empty intermediate node.
+        // As you look for nodes, pop the elements from the stack if it's not something you're look 
+        // for + ignore any with column greater OR EQUAL to token's column count at any when looking 
+        // for a node to attach to. If the stack become empty, return an empty intermediate node.
         while (stack.length > 0) {
             const back = stack[stack.length - 1];
             if (back.token.column < col && token_types.includes(back.token.type)) {
@@ -407,23 +422,21 @@ export function Parse(data) {
         return null;
     }
     for (const token of Tokenize(data)) {
-        // If the token type is a text, look for an element in the stack that's 
-        // of type 'Colon' or 'None'
+        // If the token type is a text, look for an element in the stack that's of type 'Colon' or 
+        // 'None'
         if (token.type === 'Text') {
             const node_to_attach_to = seekFn(token.column, ['Colon', 'None']);
             if (node_to_attach_to === null) {
                 console.error("Failed to parse given papr data");
                 return null;
             }
-            // Don't worry about leaf nodes being connected to other leaf nodes. 
-            // We can deal with that later once all the tokens have been parsed 
-            // and inserted into the group/none nodes with token's text as a key 
-            // node
+            // Don't worry about leaf nodes being connected to other leaf nodes. We can deal with 
+            // that later once all the tokens have been parsed and inserted into the group/none 
+            // nodes with token's text as a key node
             const node = node_to_attach_to.AddNode(Node.MakeKey(token.text));
             stack.push({ node: node, token: token });
         }
-        // If the token is a colon, look for an element in the stack that's of 
-        // type 'Text'
+        // If the token is a colon, look for an element in the stack that's of type 'Text'
         else if (token.type === 'Colon') {
             const node_to_attach_to = seekFn(token.column, ['Text']);
             if (node_to_attach_to === null) {
@@ -435,10 +448,9 @@ export function Parse(data) {
             stack.push({ node: node, token: token });
         }
     }
-    // Simplify will reorganize the existing parsed structure to be in a much 
-    // more simpler and user friendly form. This includes turning childless 
-    // keys into values, rerouting groups with a single node and collapsing 
-    // multiple value nodes into a single value node separated by an 
+    // Simplify will reorganize the existing parsed structure to be in a much more simpler and user 
+    // friendly form. This includes turning childless keys into values, rerouting groups with a 
+    // single node and collapsing multiple value nodes into a single value node separated by an 
     // additional space.
     root.Simplify();
     return root;
@@ -468,24 +480,21 @@ export function ToJson(node, value_as_primitive = true) {
             }
             return object;
         }
-        // Lastly, if every node is a value combine them into a space separated 
-        // strings. The one exception is going to be a singular value, then 
-        // return as is
+        // Lastly, if every node is a value combine them into a space separated strings. The one 
+        // exception is going to be a singular value, then return as is.
         if (nodes.every((node) => node.type === 'Value')) {
             if (nodes.length === 1) {
                 return ToJson(nodes[0]);
             }
             return nodes.map((node) => node.text).join(' ');
         }
-        // Contains a mixed bag of things, this isn't really something that I 
-        // expected. If it happens lets deal with that in the future, but for 
-        // now returning null
+        // Contains a mixed bag of things, this isn't really something that I expected. If it 
+        // happens lets deal with that in the future, but for now returning null.
         return null;
     }
     if (node.type === "Value") {
-        // A value node has no children, so we only care about its text value. 
-        // We will also attempt to convert the string into a primitive type 
-        // values when requested
+        // A value node has no children, so we only care about its text value. We will also attempt 
+        // to convert the string into a primitive type values when requested.
         if (value_as_primitive && node.text.length > 0) {
             if (node.text === "true") {
                 return true;
@@ -509,8 +518,8 @@ export function ToJson(node, value_as_primitive = true) {
     else if (node.type === "Key") {
         return { [node.text]: m_Flatten(node.children) };
     }
-    // It's either a 'group' or 'none' node, simply collapse any children and 
-    // return back. The 'none' node is currently only reserved for the root node
+    // It's either a 'group' or 'none' node, simply collapse any children and return back. The 
+    // 'none' node is currently only reserved for the root node.
     return m_Flatten(node.children);
     ;
 }
